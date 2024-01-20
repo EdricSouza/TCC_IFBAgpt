@@ -259,11 +259,12 @@ def distances_from_embeddings(query_embedding, embeddings, distance_metric='cosi
     return distances
 
 
-
 def create_context(question, df, max_len=1800, size="ada"):
 
     # Obter a embeddings para a pergunta que foi feita
     q_embeddings = client.embeddings.create(input=question,model='text-embedding-ada-002').data[0].embedding
+    
+    print(q_embeddings.shape)
 
     # Obter as distâncias a partir dos embeddings
     df['distances'] = distances_from_embeddings(q_embeddings, df['embeddings'].values, distance_metric='cosine')
