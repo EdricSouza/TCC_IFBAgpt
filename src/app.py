@@ -14,12 +14,16 @@ from urllib.request import Request, urlopen
 
 import gradio as gr
 import tiktoken
-import openai
 import time
+import openai
+from openai import OpenAI
+
+client = OpenAI(api_key="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")
 
 
+#urls = ['https://portal.ifba.edu.br/','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-integrados---','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-integrados-proeja---','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-subsequentes---','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-concomitantes---','https://portal.ifba.edu.br/campi/escolhacampus']
 
-urls = ['https://portal.ifba.edu.br/','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-integrados---','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-integrados-proeja---','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-subsequentes---','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-concomitantes---']
+urls = ['https://portal.ifba.edu.br/']
 
 domain = "portal.ifba.edu.br"
 
@@ -68,7 +72,7 @@ def get_text_from_url(url):
             f.write(text)
 
         driver.close()
-get_text_from_url(url)
+#get_text_from_url(url)
 
 def remove_newlines(serie):
     '''
@@ -184,39 +188,48 @@ print("Número de trechos de texto com no máximo",max_tokens,"tokens :",i)
 
 print("Custo total de treinamento do embedding: $",num_tot_tokens /1000 * 0.0001)
 
-def read_openai_api_key():
-    with open('openai_secret.txt', 'r') as file:
-        api_key = file.read().strip()
-    return api_key
+#def read_openai_api_key():
+#    with open('openai_secret.txt', 'r') as file:
+#        api_key = file.read().strip()
+#    return api_key
 
-my_api_key = read_openai_api_key()
+#my_api_key = read_openai_api_key()
+my_api_key = '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'
 
-openai.api_key = read_openai_api_key()
+#openai.api_key = read_openai_api_key()
+openai.api_key = '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'
 
 i = 0
 embeddings = []
 for text in df['text']:
-    time.sleep(2)
-    print(i)
-    try:
-        embedding = openai.Embedding.create(input=text, engine='text-embedding-ada-002')['data'][0]['embedding']
-        print("Fazendo embedding do texto")
-        embeddings.append(embedding)
-    except openai.error.RateLimitError:
-        print("Rate limit error, esperando 20 segundo antes de tentar novamente")
-        time.sleep(20)  
-        embedding = openai.Embedding.create(input=text, engine='text-embedding-ada-002')['data'][0]['embedding']
-        print("embedding texto depois de esperar 20 segundos")
-        embeddings.append(embedding)
-    i+=1
+     time.sleep(0)
+     print(i)
+     try:
+         embedding = client.embeddings.create(input=text, model='text-embedding-ada-002').data[0].embedding
+         print("Fazendo embedding do texto")
+         embeddings.append(embedding)
+     except openai.APIConnectionError as e:
+         if e:
+             print("The server could not be reached")
+             print(e.__cause__)  # an underlying Exception, likely raised within httpx.
+             break
+     except openai.RateLimitError as e:
+         if e:
+             print("A 429 status code was received; we should back off a bit.")
+             break
+     except openai.APIStatusError as e:
+         if e:
+             print("Another non-200-range status code was received")
+             print(e.status_code)
+             print(e.response)
+             break
+     i+=1
 
 df['embeddings'] = embeddings
 df.to_csv('processed/embeddings.csv')
 df.head()
-
 df=pd.read_csv('processed/embeddings.csv', index_col=0)
 df['embeddings'] = df['embeddings'].apply(eval).apply(np.array)
-
 df.head()
 
 import numpy as np
@@ -234,12 +247,17 @@ def distances_from_embeddings(query_embedding, embeddings, distance_metric='cosi
     - Um array de distâncias entre o embedding de consulta e os embeddings fornecidos.
     """
     if distance_metric == 'cosine':
-        distances = np.dot(embeddings, query_embedding) / (np.linalg.norm(embeddings, axis=1) * np.linalg.norm(query_embedding))
+        # Adicionando uma dimensão ao query_embedding
+        query_embedding = np.expand_dims(query_embedding, 0)
+        print("Forma original de embeddings:", embeddings.shape)
+        print("Forma original de query_embedding:", query_embedding.shape)
+        distances = np.dot(embeddings, query_embedding) / (np.linalg.norm(embeddings) * np.linalg.norm(query_embedding))
         distances = 1 - distances  # Convertendo similaridade cosseno para distância cosseno
     else:
         raise ValueError("Métrica de distância não suportada. Utilize 'cosine'.")
 
     return distances
+
 
 
 def create_context(question, df, max_len=1800, size="ada"):
@@ -248,7 +266,7 @@ def create_context(question, df, max_len=1800, size="ada"):
     """
 
     # Obter a embeddings para a pergunta que foi feita
-    q_embeddings = openai.Embedding.create(input=question, engine='text-embedding-ada-002')['data'][0]['embedding']
+    q_embeddings = client.embeddings.create(input=question,model='text-embedding-ada-002').data[0].embedding
 
     # Obter as distâncias a partir dos embeddings
     df['distances'] = distances_from_embeddings(q_embeddings, df['embeddings'].values, distance_metric='cosine')
@@ -276,7 +294,7 @@ def create_context(question, df, max_len=1800, size="ada"):
 def answer_question(
                     df=df,
                     model="text-davinci-003",
-                    question="O que é a bix tecnologia?",
+                    question="O que é o IFBA?",
                     max_len=1800,
                     size="ada",
                     debug=False,
@@ -313,28 +331,28 @@ def answer_question(
     #     retornar ""
         
 
-answer_question(question="O que é bix tecnologia?", debug=False)
-answer_question(df, question="Quero prever o dia de amanha, voces podem me ajudar?")
-answer_question(df, question="Qual telefone da bix?")
+answer_question(question="O que é o IFBA?", debug=False)
+answer_question(df, question="Quais cursos técnicos tem no IFBA campus camaçari?")
+answer_question(df, question="Qual o contato do IFBA?")
 
 def chatgpt_clone(input, history):
-    history= history or []
-    s = list(sum(history, ()))
-    s.append(input)
-    inp = ' '.join(s)
-    output=answer_question(question = inp)
-    history.append((input, output))
-    return history, history
-
+     history= history or []
+     s = list(sum(history, ()))
+     s.append(input)
+     inp = ' '.join(s)
+     output=answer_question(question = inp)
+     history.append((input, output))
+     return history, history
+    
 with gr.Blocks(theme=gr.themes.Soft(),css=".gradio-container {background-color: lightsteelblue}") as block:
-    with gr.Row():
-        img1 = gr.Image("images/BIX_branding-9.png",show_label=False, width=100, height=100)
-        img2 = gr.Image("images/Logo Azul_Vertical.png",show_label=False, width=100, height=100)
-    gr.Markdown("""<h1><center> Assistente da Bix Tecnologia</center></h1>""")
-    chatbot=gr.Chatbot(label="Conversa")
-    message=gr.Textbox(label="Faça sua pergunta",placeholder="O que você gostaria de saber sobre a Bix Tecnologia?")
-    state = gr.State()
-    submit = gr.Button("Perguntar")
-    submit.click(chatgpt_clone, inputs=[message, state], outputs=[chatbot, state])
+     with gr.Row():
+         img1 = gr.Image("images/BIX_branding-9.png",show_label=False, width=100, height=100)
+         img2 = gr.Image("images/Logo Azul_Vertical.png",show_label=False, width=100, height=100)
+     gr.Markdown("""<h1><center> Assistente do IFBA</center></h1>""")
+     chatbot=gr.Chatbot(label="Conversa")
+     message=gr.Textbox(label="Faça sua pergunta",placeholder="O que você gostaria de saber sobre o IFBA?")
+     state = gr.State()
+     submit = gr.Button("Perguntar")
+     submit.click(chatgpt_clone, inputs=[message, state], outputs=[chatbot, state])
 
 block.launch(debug=True)
