@@ -18,7 +18,7 @@ import time
 import openai
 from openai import OpenAI
 
-client = OpenAI(api_key="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")
+client = OpenAI(api_key="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")
 
 
 #urls = ['https://portal.ifba.edu.br/','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-integrados---','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-integrados-proeja---','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-subsequentes---','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-concomitantes---','https://portal.ifba.edu.br/campi/escolhacampus']
@@ -194,10 +194,10 @@ print("Custo total de treinamento do embedding: $",num_tot_tokens /1000 * 0.0001
 #    return api_key
 
 #my_api_key = read_openai_api_key()
-my_api_key = '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'
+my_api_key = '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'
 
 #openai.api_key = read_openai_api_key()
-openai.api_key = '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'
+openai.api_key = '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'
 
 i = 0
 embeddings = []
@@ -261,9 +261,6 @@ def distances_from_embeddings(query_embedding, embeddings, distance_metric='cosi
 
 
 def create_context(question, df, max_len=1800, size="ada"):
-    """
-    Cria um contexto para uma pergunta encontrando o contexto mais similar no conjunto de embeddings gerado utilizando o Custom Knowledge.
-    """
 
     # Obter a embeddings para a pergunta que foi feita
     q_embeddings = client.embeddings.create(input=question,model='text-embedding-ada-002').data[0].embedding
