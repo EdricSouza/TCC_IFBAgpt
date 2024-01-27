@@ -379,10 +379,10 @@ css = """
 
 """
 
-with gr.Blocks(theme=gr.themes.Soft(),css=css) as block:
+with gr.Blocks(theme=gr.themes.Base(),css=css) as block:
      gr.Markdown("""<h1><center> Assistente do IFBA</center></h1>""")
-     chatbot=gr.Chatbot(label="Conversa")
-     message=gr.Textbox(label="Faça sua pergunta",placeholder="O que você gostaria de saber sobre o IFBA?")
+     chatbot=gr.Chatbot(label="Conversa", elem_classes='titulo')
+     message=gr.Textbox(label="Faça sua pergunta",placeholder="O que você gostaria de saber sobre o IFBA?", elem_classes='titulo')
      state = gr.State()
      submit = gr.Button("Perguntar")
      submit.click(chatgpt_clone, inputs=[message, state], outputs=[chatbot, state])
