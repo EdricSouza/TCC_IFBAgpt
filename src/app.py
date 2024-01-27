@@ -21,9 +21,7 @@ from openai import OpenAI
 client = OpenAI(api_key="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")
 
 
-#urls = ['https://portal.ifba.edu.br/','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-integrados---','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-integrados-proeja---','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-subsequentes---','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-concomitantes---','https://portal.ifba.edu.br/campi/escolhacampus']
-
-urls = ['https://portal.ifba.edu.br/']
+urls = ['https://portal.ifba.edu.br/','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-integrados---','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-integrados-proeja---','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-subsequentes---','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-concomitantes---','https://portal.ifba.edu.br/campi/escolhacampus']
 
 domain = "portal.ifba.edu.br"
 
@@ -199,99 +197,135 @@ my_api_key = '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'
 #openai.api_key = read_openai_api_key()
 openai.api_key = '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'
 
-i = 0
-embeddings = []
-for text in df['text']:
-     time.sleep(0)
-     print(i)
-     try:
-         embedding = client.embeddings.create(input=text, model='text-embedding-ada-002').data[0].embedding
-         print("Fazendo embedding do texto")
-         embeddings.append(embedding)
-     except openai.APIConnectionError as e:
-         if e:
-             print("The server could not be reached")
-             print(e.__cause__)  # an underlying Exception, likely raised within httpx.
-             break
-     except openai.RateLimitError as e:
-         if e:
-             print("A 429 status code was received; we should back off a bit.")
-             break
-     except openai.APIStatusError as e:
-         if e:
-             print("Another non-200-range status code was received")
-             print(e.status_code)
-             print(e.response)
-             break
-     i+=1
+# Verificar se o arquivo 'embeddings.csv' existe
+embeddings_file_path = 'processed/embeddings.csv'
+if os.path.exists(embeddings_file_path):
+    # Se existir, carregar os embeddings do arquivo
+    df = pd.read_csv(embeddings_file_path, index_col=0)
+    df['embeddings'] = df['embeddings'].apply(eval).apply(np.array)
+    print("Embeddings carregados do arquivo 'embeddings.csv'")
+else:
+    # Se não existir, criar os embeddings
+    i = 0
+    embeddings = []
+    for text in df['text']:
+        time.sleep(0)
+        print(i)
+        try:
+            embedding = client.embeddings.create(input=text, model='text-embedding-3-small').data[0].embedding
+            print("Fazendo embedding do texto")
+            embeddings.append(embedding)
+        except openai.APIConnectionError as e:
+            if e:
+                print("O servidor não pôde ser alcançado")
+                print(e.__cause__)  # uma Exception subjacente, provavelmente levantada dentro do httpx.
+                break
+        except openai.RateLimitError as e:
+            if e:
+                print("Foi recebido um código de status 429; devemos recuar um pouco.")
+                break
+        except openai.APIStatusError as e:
+            if e:
+                print("Outro código de status fora da faixa 200 foi recebido")
+                print(e.status_code)
+                print(e.response)
+                break
+        i += 1
 
-df['embeddings'] = embeddings
-df.to_csv('processed/embeddings.csv')
-df.head()
+    df['embeddings'] = embeddings
+    df.to_csv(embeddings_file_path)
+    print("Embeddings salvos no arquivo 'embeddings.csv'")
 df=pd.read_csv('processed/embeddings.csv', index_col=0)
 df['embeddings'] = df['embeddings'].apply(eval).apply(np.array)
 df.head()
 
 import numpy as np
+from scipy.spatial.distance import cdist
 
-def distances_from_embeddings(query_embedding, embeddings, distance_metric='cosine'):
+def distances_from_embeddings(q_embeddings, embeddings, distance_metric='cosine'):
     """
     Calcula as distâncias entre o embedding de consulta e um conjunto de embeddings usando uma métrica de distância específica.
     
     Parâmetros:
-    - query_embedding: O embedding da consulta.
+    - q_embeddings: O embedding da consulta (pode ser uma lista ou array).
     - embeddings: Um array ou DataFrame de embeddings.
     - distance_metric: A métrica de distância a ser utilizada (por exemplo, 'cosine' para a distância cosseno).
 
     Retorna:
     - Um array de distâncias entre o embedding de consulta e os embeddings fornecidos.
     """
-    if distance_metric == 'cosine':
-        # Adicionando uma dimensão ao query_embedding
-        query_embedding = np.expand_dims(query_embedding, 0)
-        print("Forma original de embeddings:", embeddings.shape)
-        print("Forma original de query_embedding:", query_embedding.shape)
-        distances = np.dot(embeddings, query_embedding) / (np.linalg.norm(embeddings) * np.linalg.norm(query_embedding))
-        distances = 1 - distances  # Convertendo similaridade cosseno para distância cosseno
-    else:
-        raise ValueError("Métrica de distância não suportada. Utilize 'cosine'.")
+    try:
+        # Converte q_embeddings para um array NumPy, se não for do tipo array
+        q_embeddings = np.array(q_embeddings)
 
-    return distances
+        # Converte embeddings para um array NumPy, se não for do tipo array
+        embeddings = np.array(embeddings)
+
+        # Imprime as formas dos embeddings
+        print("Shape of q_embedding:", q_embeddings.shape)
+        print("Shape of embeddings:", embeddings.shape)
+
+
+
+        # Verifica a métrica de distância e calcula as distâncias
+        if distance_metric == 'cosine':
+            distances = cdist(q_embeddings, embeddings, metric='cosine')[0]
+        elif distance_metric == 'euclidean':
+            distances = cdist(q_embeddings, embeddings, metric='euclidean')[0]
+        else:
+            raise ValueError("Métrica de distância inválida.")
+
+        # Adiciona as distâncias ao DataFrame
+        embeddings['distances'] = distances
+    except openai.APIStatusError as e:
+        print(e.status_code)
+    except ValueError as e:
+        print("Métrica de distância inválida.", e)
+    except KeyError as e:
+        print("Chave inexistente no dataframe:", e)
+    except IndexError as e:
+        print("Índice do embedding da consulta inválido.", e)
+    except Exception as e:
+        print("Erro inesperado:", e)
+    return embeddings
+
+
 
 
 def create_context(question, df, max_len=1800, size="ada"):
 
-    # Obter a embeddings para a pergunta que foi feita
-    q_embeddings = client.embeddings.create(input=question,model='text-embedding-ada-002').data[0].embedding
-    
-    print(q_embeddings.shape)
+    try:
+        # Obter a embeddings para a pergunta que foi feita
+        q_embeddings = client.embeddings.create(input=question,model='text-embedding-ada-002').data[0].embedding
 
-    # Obter as distâncias a partir dos embeddings
-    df['distances'] = distances_from_embeddings(q_embeddings, df['embeddings'].values, distance_metric='cosine')
+        # Obter as distâncias a partir dos embeddings
+        df['distances'] = distances_from_embeddings(q_embeddings, df['embeddings'].values, distance_metric='cosine')
 
 
-    returns = []
-    cur_len = 0
+        returns = []
+        cur_len = 0
 
-    # Classifique por distância e adicione o texto ao contexto
-    for i, row in df.sort_values('distances', ascending=True).iterrows():
-        
-        # Adicionar o comprimento do texto ao comprimento atual
-        cur_len += row['n_tokens'] + 4
-        
-        # Se o contexto for muito longo, quebre
-        if cur_len > max_len:
-            break
-        
-        # Caso contrário, adicione-o ao texto que está sendo retornado
-        returns.append(row["text"])
+        # Classifique por distância e adicione o texto ao contexto
+        for i, row in df.sort_values('distances', ascending=True).iterrows():
+            
+            # Adicionar o comprimento do texto ao comprimento atual
+            cur_len += row['n_tokens'] + 4
+            
+            # Se o contexto for muito longo, quebre
+            if cur_len > max_len:
+                break
+            
+            # Caso contrário, adicione-o ao texto que está sendo retornado
+            returns.append(row["text"])
 
-    # Retornar o contexto
-    return "\n\n###\n\n".join(returns)
+        # Retornar o contexto
+        return "\n\n###\n\n".join(returns)
+    except Exception as e:
+        print('Erro na hora de criar contexto', e)
 
 def answer_question(
                     df=df,
-                    model="text-davinci-003",
+                    model="gpt-3.5-turbo-instruct",
                     question="O que é o IFBA?",
                     max_len=1800,
                     size="ada",
@@ -310,11 +344,10 @@ def answer_question(
     if debug:
         print("Context:\n" + context)
         print("\n\n")
-
     try:
         # Criar uma conclusão usando a pergunta e o contexto
-        response = openai.Completion.create(
-            prompt=f"Responda as perguntas com base no contexto abaixo, e se a pergunta não puder ser respondida diga \"Eu não sei responder isso\"\nContexto: {context}\n\n---\n\nPergunta: {question}\nResposta:",
+        response = client.completions.create(
+            prompt=f"Responda as perguntas com base no contexto abaixo, e se a pergunta não puder ser respondida diga \"Eu não sei responder so\"\nContexto: {context}\n\n---\n\nPergunta: {question}\nResposta:",
             temperature=0,
             max_tokens=max_tokens,
             top_p=1,
@@ -327,8 +360,7 @@ def answer_question(
     except Exception as e:
         print(e)
     #     retornar ""
-        
-
+      
 answer_question(question="O que é o IFBA?", debug=False)
 answer_question(df, question="Quais cursos técnicos tem no IFBA campus camaçari?")
 answer_question(df, question="Qual o contato do IFBA?")
@@ -341,16 +373,17 @@ def chatgpt_clone(input, history):
      output=answer_question(question = inp)
      history.append((input, output))
      return history, history
-    
-with gr.Blocks(theme=gr.themes.Soft(),css=".gradio-container {background-color: lightsteelblue}") as block:
-     with gr.Row():
-         img1 = gr.Image("images/BIX_branding-9.png",show_label=False, width=100, height=100)
-         img2 = gr.Image("images/Logo Azul_Vertical.png",show_label=False, width=100, height=100)
+
+css = """
+.gradio-container {background-color: black}
+
+"""
+
+with gr.Blocks(theme=gr.themes.Soft(),css=css) as block:
      gr.Markdown("""<h1><center> Assistente do IFBA</center></h1>""")
      chatbot=gr.Chatbot(label="Conversa")
      message=gr.Textbox(label="Faça sua pergunta",placeholder="O que você gostaria de saber sobre o IFBA?")
      state = gr.State()
      submit = gr.Button("Perguntar")
      submit.click(chatgpt_clone, inputs=[message, state], outputs=[chatbot, state])
-
-block.launch(debug=True)
+block.launch(debug=True, share=True)
