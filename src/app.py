@@ -240,54 +240,54 @@ df['embeddings'] = df['embeddings'].apply(eval).apply(np.array)
 df.head()
 
 import numpy as np
-from scipy.spatial.distance import cdist
+from scipy.spatial.distance import cosine
 
-def distances_from_embeddings(q_embeddings, embeddings, distance_metric='cosine'):
-    """
-    Calcula as distâncias entre o embedding de consulta e um conjunto de embeddings usando uma métrica de distância específica.
+# def distances_from_embeddings(q_embeddings, embeddings, distance_metric='cosine'):
+#     """
+#     Calcula as distâncias entre o embedding de consulta e um conjunto de embeddings usando uma métrica de distância específica.
     
-    Parâmetros:
-    - q_embeddings: O embedding da consulta (pode ser uma lista ou array).
-    - embeddings: Um array ou DataFrame de embeddings.
-    - distance_metric: A métrica de distância a ser utilizada (por exemplo, 'cosine' para a distância cosseno).
+#     Parâmetros:
+#     - q_embeddings: O embedding da consulta (pode ser uma lista ou array).
+#     - embeddings: Um array ou DataFrame de embeddings.
+#     - distance_metric: A métrica de distância a ser utilizada (por exemplo, 'cosine' para a distância cosseno).
 
-    Retorna:
-    - Um array de distâncias entre o embedding de consulta e os embeddings fornecidos.
-    """
-    try:
-        # Converte q_embeddings para um array NumPy, se não for do tipo array
-        q_embeddings = np.array(q_embeddings)
+#     Retorna:
+#     - Um array de distâncias entre o embedding de consulta e os embeddings fornecidos.
+#     """
+#     try:
+#         # Converte q_embeddings para um array NumPy, se não for do tipo array
+#         q_embeddings = np.array(q_embeddings)
 
-        # Converte embeddings para um array NumPy, se não for do tipo array
-        embeddings = np.array(embeddings)
+#         # Converte embeddings para um array NumPy, se não for do tipo array
+#         embeddings = np.array(embeddings)
 
-        # Imprime as formas dos embeddings
-        print("Shape of q_embedding:", q_embeddings.shape)
-        print("Shape of embeddings:", embeddings.shape)
+#         # Imprime as formas dos embeddings
+#         print("Shape of q_embedding:", q_embeddings.shape)
+#         print("Shape of embeddings:", embeddings.shape)
 
 
 
-        # Verifica a métrica de distância e calcula as distâncias
-        if distance_metric == 'cosine':
-            distances = cdist(q_embeddings, embeddings, metric='cosine')[0]
-        elif distance_metric == 'euclidean':
-            distances = cdist(q_embeddings, embeddings, metric='euclidean')[0]
-        else:
-            raise ValueError("Métrica de distância inválida.")
+#         # Verifica a métrica de distância e calcula as distâncias
+#         if distance_metric == 'cosine':
+#             distances = cdist(q_embeddings, embeddings, metric='cosine')[0]
+#         elif distance_metric == 'euclidean':
+#             distances = cdist(q_embeddings, embeddings, metric='euclidean')[0]
+#         else:
+#             raise ValueError("Métrica de distância inválida.")
 
-        # Adiciona as distâncias ao DataFrame
-        embeddings['distances'] = distances
-    except openai.APIStatusError as e:
-        print(e.status_code)
-    except ValueError as e:
-        print("Métrica de distância inválida.", e)
-    except KeyError as e:
-        print("Chave inexistente no dataframe:", e)
-    except IndexError as e:
-        print("Índice do embedding da consulta inválido.", e)
-    except Exception as e:
-        print("Erro inesperado:", e)
-    return embeddings
+#         # Adiciona as distâncias ao DataFrame
+#         embeddings['distances'] = distances
+#     except openai.APIStatusError as e:
+#         print(e.status_code)
+#     except ValueError as e:
+#         print("Métrica de distância inválida.", e)
+#     except KeyError as e:
+#         print("Chave inexistente no dataframe:", e)
+#     except IndexError as e:
+#         print("Índice do embedding da consulta inválido.", e)
+#     except Exception as e:
+#         print("Erro inesperado:", e)
+#     return embeddings
 
 
 
@@ -299,8 +299,8 @@ def create_context(question, df, max_len=1800, size="ada"):
         q_embeddings = client.embeddings.create(input=question,model='text-embedding-ada-002').data[0].embedding
 
         # Obter as distâncias a partir dos embeddings
-        df['distances'] = distances_from_embeddings(q_embeddings, df['embeddings'].values, distance_metric='cosine')
-
+        df['distances'] = cosine(q_embeddings, df['embeddings'].values)
+        print(df['distances'])
 
         returns = []
         cur_len = 0
