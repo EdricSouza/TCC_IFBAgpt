@@ -9,7 +9,6 @@ from collections import deque
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 from selenium.webdriver import Chrome
-from selenium.webdriver.common.by import By
 from urllib.request import Request, urlopen
 
 import gradio as gr
@@ -295,12 +294,14 @@ from scipy.spatial.distance import cosine
 def create_context(question, df, max_len=1800, size="ada"):
 
     try:
-        # Obter a embeddings para a pergunta que foi feita
+        # Crie uma cópia do dataframe df
+        df_copy = df.copy()
+
+        # Obtenha as incorporações para a pergunta
         q_embeddings = client.embeddings.create(input=question,model='text-embedding-ada-002').data[0].embedding
 
-        # Obter as distâncias a partir dos embeddings
-        df['distances'] = cosine(q_embeddings, df['embeddings'].values)
-        print(df['distances'])
+        # Adicione as q_embeddings ao dataframe df_copy
+        df_copy['q_embeddings'] = q_embeddings
 
         returns = []
         cur_len = 0
@@ -361,9 +362,7 @@ def answer_question(
         print(e)
     #     retornar ""
       
-answer_question(question="O que é o IFBA?", debug=False)
 answer_question(df, question="Quais cursos técnicos tem no IFBA campus camaçari?")
-answer_question(df, question="Qual o contato do IFBA?")
 
 def chatgpt_clone(input, history):
      history= history or []
