@@ -6,10 +6,8 @@ import requests  # Import the requests library
 
 from bs4 import BeautifulSoup
 from collections import deque
-from html.parser import HTMLParser
 from urllib.parse import urlparse
 from selenium.webdriver import Chrome
-from urllib.request import Request, urlopen
 
 import gradio as gr
 import tiktoken
@@ -26,15 +24,12 @@ domain = "portal.ifba.edu.br"
 
 url = "https://portal.ifba.edu.br/"
 
-
-import hashlib
-
 def get_text_from_url(url):
     '''
         Essa função recebe uma url e faz o scraping do texto da página
         Retorna o texto da página e salva o texto em um arquivo <url>.txt
     '''
-    
+
     # Analisa a URL e pega o domínio
     local_domain = urlparse(url).netloc
     print(local_domain)
@@ -81,7 +76,7 @@ def remove_newlines(serie):
     serie = serie.str.replace('  ', ' ')
     return serie
 
-# Criar uma lista para armazenar os arquivos de texto
+# Criar uma lista para armazenar os arquivos d texto
 texts=[]
 # Obter todos os arquivos de texto no diretório de texto
 for file in os.listdir("text/" + domain + "/"):
@@ -238,55 +233,58 @@ df.head()
 import numpy as np
 from scipy.spatial.distance import cosine
 
-def create_context(question, df, max_len=1800, size="ada"):
-
+def create_context(question, df, max_len=1800):
     try:
-        # Obter a embeddings para a pergunta que foi feita
-        q_embeddings = client.embeddings.create(input=question,model='text-embedding-ada-002').data[0].embedding
-
-        # Obter as distâncias a partir dos embeddings
-        df['distances'] = cosine(q_embeddings, df['embeddings'].values)
+        # Obter os embeddings para a pergunta
+        q_embeddings = client.embeddings.create(input=question, model='text-embedding-ada-002').data[0].embedding
+        
+        # Calcular as distâncias a partir dos embeddings da pergunta
+        df['distances'] = df['embeddings'].apply(lambda x: cosine(q_embeddings, np.array(x)))
         print(df['distances'])
 
         returns = []
         cur_len = 0
 
-        # Classifique por distância e adicione o texto ao contexto
+        # Classificar por distância e adicionar o texto ao contexto
         for i, row in df.sort_values('distances', ascending=True).iterrows():
-            
             # Adicionar o comprimento do texto ao comprimento atual
             cur_len += row['n_tokens'] + 4
             
-            # Se o contexto for muito longo, quebre
+            # Se o contexto for muito longo, interromper
             if cur_len > max_len:
                 break
             
-            # Caso contrário, adicione-o ao texto que está sendo retornado
+            # Caso contrário, adicionar ao texto retornado
             returns.append(row["text"])
 
         # Retornar o contexto
         return "\n\n###\n\n".join(returns)
     except Exception as e:
-        print('Erro na hora de criar contexto', e)
+        print('Erro ao criar contexto:', e)
+
+# Testar a função
+contexto = create_context("Quais cursos técnicos tem no IFBA campus camaçari?", df)
+print('contexto: ',contexto)
 
 def answer_question(
                     df=df,
                     model="gpt-3.5-turbo-instruct",
                     question="O que é o IFBA?",
                     max_len=1800,
-                    size="ada",
                     debug=False,
                     max_tokens=150,
                     stop_sequence=None):
+    
     """
     Responder a uma pergunta com base no contexto mais semelhante dos textos do dataframe
     """
+
     context = create_context(
         question,
         df=df,
         max_len=max_len,
-        size=size,
     )
+
     if debug:
         print("Context:\n" + context)
         print("\n\n")
@@ -300,13 +298,12 @@ def answer_question(
             frequency_penalty=0,
             presence_penalty=0,
             stop=stop_sequence,
-            model=model,
+            model= model,
         )
         return response["choices"][0]["text"].strip()
     except Exception as e:
-        print(e)
-    #     retornar ""
-      
+        print('Erro no repondendo questão: ',e)
+
 answer_question(df, question="Quais cursos técnicos tem no IFBA campus camaçari?")
 
 def chatgpt_clone(input, history):
