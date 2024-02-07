@@ -292,7 +292,7 @@ def answer_question(
     try:
         # Criar uma conclusão usando a pergunta e o contexto
         response = client.completions.create(
-            prompt=f"Responda as perguntas com base no contexto abaixo, e se a pergunta não puder ser respondida diga \"Eu não sei responder\"\nContexto: {context}\n\n---\n\nPergunta: {question}\nResposta:",
+            prompt=f"Responda as perguntas com base no contexto abaixo e se a pergunta não puder ser respondida diga \"Eu não sei responder\"\nContexto: {context}\n\n---\n\nPergunta: {question}\nResposta:",
             temperature=0,
             max_tokens=max_tokens,
             top_p=1,
@@ -306,13 +306,13 @@ def answer_question(
         print('=-'*50)
         # Retorna o texto da primeira escolha (choice) da resposta
         return response.choices[0].text.strip()
-
-        # return response["choices"][0]["text"].strip()
     except Exception as e:
         print('Erro no repondendo questão: ',e)
 
-answer_question(question="O que é o IFBA?", debug=False)
-answer_question(question="Quais são os cursos técnicos do IFBA?", debug=False)
+pergunta = ''
+while pergunta != 'sair':
+    pergunta = input('Digite sua pergunta: ')
+    answer_question(question=pergunta, debug=False)
 
 def chatgpt_clone(input, history):
      history= history or []
@@ -323,16 +323,16 @@ def chatgpt_clone(input, history):
      history.append((input, output))
      return history, history
 
-css = """
-.gradio-container {background-color: black}
+# css = """
+# .gradio-container {background-color: black}
 
-"""
+# """
 
-with gr.Blocks(theme=gr.themes.Base(),css=css) as block:
-     gr.Markdown("""<h1><center> Assistente do IFBA</center></h1>""")
-     chatbot=gr.Chatbot(label="Conversa", elem_classes='titulo')
-     message=gr.Textbox(label="Faça sua pergunta",placeholder="O que você gostaria de saber sobre o IFBA?", elem_classes='titulo')
-     state = gr.State()
-     submit = gr.Button("Perguntar")
-     submit.click(chatgpt_clone, inputs=[message, state], outputs=[chatbot, state])
-block.launch(debug=True, share=True)
+# with gr.Blocks(theme=gr.themes.Base(),css=css) as block:
+#      gr.Markdown("""<h1><center> Assistente do IFBA</center></h1>""")
+#      chatbot=gr.Chatbot(label="Conversa", elem_classes='titulo')
+#      message=gr.Textbox(label="Faça sua pergunta",placeholder="O que você gostaria de saber sobre o IFBA?", elem_classes='titulo')
+#      state = gr.State()
+#      submit = gr.Button("Perguntar")
+#      submit.click(chatgpt_clone, inputs=[message, state], outputs=[chatbot, state])
+# block.launch(debug=True, share=True)
