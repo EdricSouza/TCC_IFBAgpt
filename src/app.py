@@ -240,7 +240,6 @@ def create_context(question, df, max_len=1800):
         
         # Calcular as distâncias a partir dos embeddings da pergunta
         df['distances'] = df['embeddings'].apply(lambda x: cosine(q_embeddings, np.array(x)))
-        print(df['distances'])
 
         returns = []
         cur_len = 0
@@ -265,6 +264,8 @@ def create_context(question, df, max_len=1800):
 # Testar a função
 contexto = create_context("Quais cursos técnicos tem no IFBA campus camaçari?", df)
 print('contexto: ',contexto)
+
+print(df['distances'])
 
 def answer_question(
                     df=df,
@@ -291,7 +292,7 @@ def answer_question(
     try:
         # Criar uma conclusão usando a pergunta e o contexto
         response = client.completions.create(
-            prompt=f"Responda as perguntas com base no contexto abaixo, e se a pergunta não puder ser respondida diga \"Eu não sei responder so\"\nContexto: {context}\n\n---\n\nPergunta: {question}\nResposta:",
+            prompt=f"Responda as perguntas com base no contexto abaixo, e se a pergunta não puder ser respondida diga \"Eu não sei responder\"\nContexto: {context}\n\n---\n\nPergunta: {question}\nResposta:",
             temperature=0,
             max_tokens=max_tokens,
             top_p=1,
@@ -300,11 +301,18 @@ def answer_question(
             stop=stop_sequence,
             model= model,
         )
-        return response["choices"][0]["text"].strip()
+        print('=-'*50)
+        print(response)
+        print('=-'*50)
+        # Retorna o texto da primeira escolha (choice) da resposta
+        return response.choices[0].text.strip()
+
+        # return response["choices"][0]["text"].strip()
     except Exception as e:
         print('Erro no repondendo questão: ',e)
 
-answer_question(df, question="Quais cursos técnicos tem no IFBA campus camaçari?")
+answer_question(question="O que é o IFBA?", debug=False)
+answer_question(question="Quais são os cursos técnicos do IFBA?", debug=False)
 
 def chatgpt_clone(input, history):
      history= history or []
