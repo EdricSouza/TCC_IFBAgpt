@@ -14,9 +14,10 @@ import tiktoken
 import time
 import openai
 from openai import OpenAI
+from dotenv import load_dotenv
 
-client = OpenAI(api_key="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")
-
+load_dotenv()
+client = OpenAI(api_key=os.getenv('openaisecret'))
 
 urls = ['https://portal.ifba.edu.br/','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-integrados---','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-integrados-proeja---','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-subsequentes---','https://portal.ifba.edu.br/ensino/nossos-cursos/curso-tecnico/tecnicos-concomitantes---','https://portal.ifba.edu.br/campi/escolhacampus']
 
@@ -180,14 +181,6 @@ print("Número de trechos de texto com no máximo",max_tokens,"tokens :",i)
 
 print("Custo total de treinamento do embedding: $",num_tot_tokens /1000 * 0.0001)
 
-#def read_openai_api_key():
-#    with open('openai_secret.txt', 'r') as file:
-#        api_key = file.read().strip()
-#    return api_key
-
-#my_api_key = read_openai_api_key()
-
-
 # Verificar se o arquivo 'embeddings.csv' existe
 embeddings_file_path = 'processed/embeddings.csv'
 if os.path.exists(embeddings_file_path):
@@ -270,7 +263,7 @@ print(df['distances'])
 def answer_question(
                     df=df,
                     model="gpt-3.5-turbo-instruct",
-                    question="O que é o IFBA?",
+                    question="",
                     max_len=1800,
                     debug=False,
                     max_tokens=150,
@@ -292,8 +285,8 @@ def answer_question(
     try:
         # Criar uma conclusão usando a pergunta e o contexto
         response = client.completions.create(
-            prompt=f"Responda as perguntas com base no contexto abaixo e se a pergunta não puder ser respondida diga \"Eu não sei responder\"\nContexto: {context}\n\n---\n\nPergunta: {question}\nResposta:",
-            temperature=0,
+            # prompt=f"Responda as perguntas com base no contexto abaixo e se a pergunta não puder ser respondida diga \"Eu não sei responder\"\nContexto: {context}\n\n---\n\nPergunta: {question}\nResposta:",
+            temperature=0.5,
             max_tokens=max_tokens,
             top_p=1,
             frequency_penalty=0,
@@ -305,7 +298,9 @@ def answer_question(
         print(response)
         print('=-'*50)
         # Retorna o texto da primeira escolha (choice) da resposta
-        return response.choices[0].text.strip()
+        response =  response.choices[0].text.strip()
+        return response
+
     except Exception as e:
         print('Erro no repondendo questão: ',e)
 
@@ -313,26 +308,3 @@ pergunta = ''
 while pergunta != 'sair':
     pergunta = input('Digite sua pergunta: ')
     answer_question(question=pergunta, debug=False)
-
-def chatgpt_clone(input, history):
-     history= history or []
-     s = list(sum(history, ()))
-     s.append(input)
-     inp = ' '.join(s)
-     output=answer_question(question = inp)
-     history.append((input, output))
-     return history, history
-
-# css = """
-# .gradio-container {background-color: black}
-
-# """
-
-# with gr.Blocks(theme=gr.themes.Base(),css=css) as block:
-#      gr.Markdown("""<h1><center> Assistente do IFBA</center></h1>""")
-#      chatbot=gr.Chatbot(label="Conversa", elem_classes='titulo')
-#      message=gr.Textbox(label="Faça sua pergunta",placeholder="O que você gostaria de saber sobre o IFBA?", elem_classes='titulo')
-#      state = gr.State()
-#      submit = gr.Button("Perguntar")
-#      submit.click(chatgpt_clone, inputs=[message, state], outputs=[chatbot, state])
-# block.launch(debug=True, share=True)
