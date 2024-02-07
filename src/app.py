@@ -285,7 +285,7 @@ def answer_question(
     try:
         # Criar uma conclusão usando a pergunta e o contexto
         response = client.completions.create(
-            # prompt=f"Responda as perguntas com base no contexto abaixo e se a pergunta não puder ser respondida diga \"Eu não sei responder\"\nContexto: {context}\n\n---\n\nPergunta: {question}\nResposta:",
+            prompt=f"Converse e responda as perguntas com base no contexto abaixo e se a pergunta não puder ser respondida diga \nContexto: {context}\n\n---\n\nPergunta: {question}\nResposta:",
             temperature=0.5,
             max_tokens=max_tokens,
             top_p=1,
