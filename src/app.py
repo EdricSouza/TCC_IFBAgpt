@@ -1,20 +1,14 @@
 import pandas as pd
 import numpy as np
 import os
-import matplotlib.pyplot as plt
-import requests  # Import the requests library
 
-from bs4 import BeautifulSoup
-from collections import deque
-from urllib.parse import urlparse
-from selenium.webdriver import Chrome
-
-import gradio as gr
 import tiktoken
 import time
-import openai
 from openai import OpenAI
 from dotenv import load_dotenv
+
+from utils.utils_text import *
+from utils.utils_gpt import *
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv('openaisecret'))
@@ -25,46 +19,6 @@ domain = "portal.ifba.edu.br"
 
 url = "https://portal.ifba.edu.br/"
 
-def get_text_from_url(url):
-    '''
-        Essa função recebe uma url e faz o scraping do texto da página
-        Retorna o texto da página e salva o texto em um arquivo <url>.txt
-    '''
-
-    # Analisa a URL e pega o domínio
-    local_domain = urlparse(url).netloc
-    print(local_domain)
-
-    # Fila para armazenar as urls para fazer o scraping
-    fila = deque(urls)
-    print(fila)
-
-    # Criar um diretório para armazenar os arquivos de texto
-    if not os.path.exists("text/"):
-            os.mkdir("text/")
-
-    if not os.path.exists("text/"+local_domain+"/"):
-            os.mkdir("text/" + local_domain + "/")
-
-    # Create a directory to store the csv files
-    if not os.path.exists("processed"):
-            os.mkdir("processed")
-
-    # Enquanto a fila não estiver vazia, continue fazendo o scraping
-    while fila:
-        # Pega a próxima URL da fila
-        url = fila.pop()
-        print("Próxima url",url) # Checa próxima url
-
-        # Salva o texto da url em um arquivo <url>.txt
-        with open('text/'+local_domain+'/'+url[8:].replace("/", "_") + ".txt", "w") as f:
-            driver = Chrome()
-            driver.get(url)
-            page_soup = BeautifulSoup(driver.page_source, 'html.parser')
-            text = page_soup.get_text()
-            f.write(text)
-
-        driver.close()
 #get_text_from_url(url)
 
 def remove_newlines(serie):
@@ -199,16 +153,16 @@ else:
             embedding = client.embeddings.create(input=text, model='text-embedding-3-small').data[0].embedding
             print("Fazendo embedding do texto")
             embeddings.append(embedding)
-        except openai.APIConnectionError as e:
+        except OpenAI.APIConnectionError as e:
             if e:
                 print("O servidor não pôde ser alcançado")
                 print(e.__cause__)  # uma Exception subjacente, provavelmente levantada dentro do httpx.
                 break
-        except openai.RateLimitError as e:
+        except OpenAI.RateLimitError as e:
             if e:
                 print("Foi recebido um código de status 429; devemos recuar um pouco.")
                 break
-        except openai.APIStatusError as e:
+        except OpenAI.APIStatusError as e:
             if e:
                 print("Outro código de status fora da faixa 200 foi recebido")
                 print(e.status_code)
@@ -223,13 +177,10 @@ df=pd.read_csv('processed/embeddings.csv', index_col=0)
 df['embeddings'] = df['embeddings'].apply(eval).apply(np.array)
 df.head()
 
-import numpy as np
-from scipy.spatial.distance import cosine
-
 def create_context(question, df, max_len=1800):
     try:
         # Obter os embeddings para a pergunta
-        q_embeddings = client.embeddings.create(input=question, model='text-embedding-ada-002').data[0].embedding
+        q_embeddings = OpenAI.client.embeddings.create(input=question, model='text-embedding-ada-002').data[0].embedding
         
         # Calcular as distâncias a partir dos embeddings da pergunta
         df['distances'] = df['embeddings'].apply(lambda x: cosine(q_embeddings, np.array(x)))
@@ -238,7 +189,7 @@ def create_context(question, df, max_len=1800):
         cur_len = 0
 
         # Classificar por distância e adicionar o texto ao contexto
-        for i, row in df.sort_values('distances', ascending=True).iterrows():
+        for row in df.sort_values('distances', ascending=True).iterrows():
             # Adicionar o comprimento do texto ao comprimento atual
             cur_len += row['n_tokens'] + 4
             
@@ -254,11 +205,7 @@ def create_context(question, df, max_len=1800):
     except Exception as e:
         print('Erro ao criar contexto:', e)
 
-# Testar a função
-contexto = create_context("Quais cursos técnicos tem no IFBA campus camaçari?", df)
-print('contexto: ',contexto)
 
-print(df['distances'])
 
 def answer_question(
                     df=df,
@@ -284,7 +231,7 @@ def answer_question(
         print("\n\n")
     try:
         # Criar uma conclusão usando a pergunta e o contexto
-        response = client.completions.create(
+        response = OpenAI.client.completions.create(
             prompt=f"Converse e responda as perguntas com base no contexto abaixo e se a pergunta não puder ser respondida diga \nContexto: {context}\n\n---\n\nPergunta: {question}\nResposta:",
             temperature=0.5,
             max_tokens=max_tokens,
@@ -304,7 +251,20 @@ def answer_question(
     except Exception as e:
         print('Erro no repondendo questão: ',e)
 
+
+
+# Testar a função
+contexto = create_context("Quais cursos técnicos tem no IFBA campus camaçari?", df)
+print('contexto: ',contexto)
+
+print("DataFrame df:", df.head())  # Verifica se o DataFrame está carregado corretamente
+
+# Dentro da função answer_question, adicione uma instrução de depuração para verificar se o DataFrame df está sendo recebido corretamente
+print("DataFrame df dentro da função:", df.head())  # Verifica se o DataFrame está sendo recebido corretamente
+
+print(df['distances'])
+
 pergunta = ''
 while pergunta != 'sair':
     pergunta = input('Digite sua pergunta: ')
-    answer_question(question=pergunta, debug=False)
+    answer_question(df=df, question=pergunta, debug=False)
