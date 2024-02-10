@@ -8,7 +8,8 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 from utils.utils_text import *
-from utils.utils_gpt import *
+
+from scipy.spatial.distance import cosine
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv('openaisecret'))
